@@ -1,4 +1,4 @@
-package jieba
+package jiebagosame
 
 import (
 
@@ -20,11 +20,13 @@ type routeItem struct{
 	loglikehood float64
 }
 
-func NewTokeniezer() (*Tokenizer, error){
+type matchFunc func(rune) bool
+
+func NewTokeniezer(dictPath string) (*Tokenizer, error){
 	freqDict := make(map[string]int)
 	var total int64 = 0
 
-	file, err := os.Open("./jieba/dict.txt")
+	file, err := os.Open(dictPath)
 	if err != nil {
 		return nil, err
 	}
@@ -59,13 +61,38 @@ func NewTokeniezer() (*Tokenizer, error){
 
 //re_han_default = re.compile("([\u4E00-\u9FD5a-zA-Z0-9+#&\._%]+)", re.U)
 
-func (tokenizer * Tokenizer) Hello(){
+func (tokenizer * Tokenizer) Cut(sentence string, cut_all bool,HMM bool) []string {
+	if cut_all{
+		panic("not yet implemented")
+	}
+	if HMM {
+		panic("HMM not yet implemented")
+	}
+	blocks := splitByHanDefault([]rune(sentence))
+	result := make([] string ,0)
+	for _, blk := range blocks{
+		if len(blk) == 0{
+			continue
+		}
+		runeBlk := []rune(blk)
+		if checkWordIfHanDefeault(runeBlk){
+			result = append(result, tokenizer.cutDagNoHMM(runeBlk)...)
+		}else{
+			for _, tempBlk := range splitByFunc(runeBlk, checkIfCharacterWhitespace)	{
+				if checkIfWordWhiteSpace(tempBlk){
+					result = append(result, string(tempBlk))
+				}else{
+					for _, sub := range tempBlk{
+						result = append(result, string(sub))
+					}
+				}
+			}
 
+		}
+	}
+	return result
 }
 
-func (Tokenizer) Cut(sentence string, cut_all bool,HMM bool) {
-
-}
 
 func (tokenizer * Tokenizer) getDAG(sentence []rune) map[int][]int{
 	dag := make(map[int][]int)
@@ -93,7 +120,7 @@ func (tokenizer * Tokenizer) getDAG(sentence []rune) map[int][]int{
 	return dag
 }
 
-func (tokenizer * Tokenizer) CutDagNoHMM(sentence []rune) []string{
+func (tokenizer * Tokenizer) cutDagNoHMM(sentence []rune) []string{
 	dag := tokenizer.getDAG(sentence)
 	route := tokenizer.calMaxLogLikehoodRoute(sentence, dag)
 	x := 0
@@ -148,15 +175,13 @@ func (tokenizer * Tokenizer) calMaxLogLikehoodRoute(sentence [] rune, dag map[in
 
 }
 
-
-
-func SplitByChinese(text string) [] string{
+func splitByHanDefault(text []rune) []string{
 	blocks := make([] string,0, len(text))
 	count := 0
 	currentInRange := true
 	currentBlock := ""
 	for _, r := range text{
-		if checkCharacterIfInRange(r){
+		if checkCharacterIfInHanDefeault(r){
 			if currentInRange {
 				currentBlock += string(r)
 			}else{
@@ -186,7 +211,16 @@ func SplitByChinese(text string) [] string{
 	return blocks
 }
 
-func checkCharacterIfInRange(r rune) bool{
+func checkWordIfHanDefeault(word []rune)bool{
+	for _, w := range word{
+		if checkCharacterIfInHanDefeault(w)==false{
+			return false
+		}
+	}
+	return true
+}
+
+func checkCharacterIfInHanDefeault(r rune) bool{
 	//re_han_default = re.compile("([\u4E00-\u9FD5a-zA-Z0-9+#&\._%]+)", re.U)
 	if r >= '\u4E00' && r <= '\u9FD5' {
 		return true
@@ -204,6 +238,23 @@ func checkCharacterIfInRange(r rune) bool{
 		return true
 	}
 	return false
+
+}
+
+func checkIfCharacterWhitespace(r rune)bool{
+	if r == rune('\r') || r == rune('\n') || r == rune('\t') || r == rune(' ') {
+		return true
+	}
+	return false
+}
+
+func checkIfWordWhiteSpace(s string) bool{
+	for _, r := range s{
+		if !checkIfCharacterWhitespace(r){
+			return false
+		}
+	}
+	return true
 
 }
 
@@ -232,14 +283,43 @@ func checkWordIfEnglish(word string) bool{
 }
 
 
-
-func IsChinese(text string) bool {
-	for _, r := range []rune(text) {
-		if r < '\u4E00' || r > '\u9FD5' {
-			return false
+func splitByFunc(text []rune, m matchFunc ) []string{
+	blocks := make([] string,0, len(text))
+	count := 0
+	currentInRange := true
+	currentBlock := ""
+	for _, r := range text{
+		if m(r){
+			if currentInRange {
+				currentBlock += string(r)
+			}else{
+				if len(currentBlock) > 0 {
+					blocks = append(blocks, currentBlock)
+					count += 1
+				}
+				currentBlock = string(r)
+				currentInRange = true
+			}
+		}else{
+			if currentInRange {
+				if len(currentBlock) > 0 {
+					blocks = append(blocks, currentBlock)
+					count += 1
+				}
+				currentBlock = string(r)
+				currentInRange = false
+			}else{
+				currentBlock += string(r)
+			}
 		}
 	}
-	return true
+	if len(currentBlock) > 0{
+		blocks = append(blocks, currentBlock)
+	}
+	return blocks
 }
+
+
+
 
 
