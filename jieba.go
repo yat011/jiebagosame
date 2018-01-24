@@ -61,6 +61,44 @@ func NewTokeniezer(dictPath string) (*Tokenizer, error){
 
 //re_han_default = re.compile("([\u4E00-\u9FD5a-zA-Z0-9+#&\._%]+)", re.U)
 
+func (tokenizer * Tokenizer) AddWord(word string, freq int, tag string){
+	if freq <= 0 {
+		freq = tokenizer.suggestFreq(word, false)
+	}
+	tokenizer.freq[word] = freq
+	tokenizer.total += int64(freq)
+	wordRune := []rune(word)
+	for indx, _ := range wordRune{
+		subword := string(wordRune[:indx+1])
+		if _, ok := tokenizer.freq[subword]; ok == false{
+			tokenizer.freq[subword] = 0
+		}
+	}
+}
+
+func (tokenizer *Tokenizer) suggestFreq(word string, tune bool) int{
+	var freq float64 = 1
+	var ok bool = false
+	var wordFreq int
+	wordFreq, ok = tokenizer.freq[word]
+	if !ok{
+		wordFreq = 1
+	}
+	for _, seg := range tokenizer.Cut(word,false, false){
+		segFreq, ok :=  tokenizer.freq[seg]
+		if !ok{
+			segFreq = 1
+		}
+		freq *= float64(segFreq) / float64(tokenizer.total)
+	}
+	sugFreq := int(freq * float64(tokenizer.total))+1
+	if wordFreq > sugFreq{
+		return wordFreq
+	}else{
+		return sugFreq
+	}
+}
+
 func (tokenizer * Tokenizer) Cut(sentence string, cut_all bool,HMM bool) []string {
 	if cut_all{
 		panic("not yet implemented")

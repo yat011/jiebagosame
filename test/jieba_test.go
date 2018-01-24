@@ -16,6 +16,7 @@ func TestJieba(t * testing.T) {
 	if err != nil{
 		panic(err)
 	}
+	tokenizer.AddWord("__解释性__",-1,"")
 	file, _ :=os.Open("./example.txt")
 	defer file.Close()
 	scanner := bufio.NewScanner(file)
